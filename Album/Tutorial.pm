@@ -1,4 +1,8 @@
-# $Id: Tutorial.pm,v 1.1 2004/08/05 20:46:00 jv Exp $
+package Album::Tutorial;
+
+# $Id: Tutorial.pm,v 1.2 2004/08/06 16:07:29 jv Exp $
+
+# NOTE: This is a documentation-only module.
 
 =pod
 
@@ -272,3 +276,5 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See either the
 GNU General Public License or the Artistic License for more details.
 
 =cut
+
+1;

@@ -8,4 +8,5 @@ helper/Makefile
 Makefile.PL
 t/basic.t
 MANIFEST
+Album.pm
 Album/Tutorial.pm
