@@ -1,8 +1,10 @@
 package Album::Tutorial;
 
-# $Id: Tutorial.pm,v 1.2 2004/08/06 16:07:29 jv Exp $
+( $VERSION ) = '$Revision: 1.3 $ ' =~ /\$Revision:\s+([^\s]+)/;
 
 # NOTE: This is a documentation-only module.
+
+use strict;
 
 =pod
 
@@ -278,3 +280,5 @@ GNU General Public License or the Artistic License for more details.
 =cut
 
 1;
+
+# $Id: Tutorial.pm,v 1.3 2004/08/06 19:25:20 jv Exp $

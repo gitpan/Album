@@ -4,13 +4,13 @@ my $RCS_Id = '$Id: album.pl,v 1.58 2004/08/06 14:27:52 jv Exp $ ';
 # Author          : Johan Vromans
 # Created On      : Tue Sep 15 15:59:04 2002
 # Last Modified By: Johan Vromans
-# Last Modified On: Fri Aug  6 16:27:27 2004
-# Update Count    : 2049
+# Last Modified On: Fri Aug  6 18:08:45 2004
+# Update Count    : 2050
 # Status          : Unknown, Use with caution!
 
 ################ Common stuff ################
 
-$VERSION = 0.05;
+$VERSION = 0.06;
 
 use strict;
 

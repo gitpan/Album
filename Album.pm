@@ -1,12 +1,14 @@
 package Album;
 
-# $Id: Album.pm,v 1.1 2004/08/06 16:07:29 jv Exp $
+( $VERSION ) = '$Revision: 1.2 $ ' =~ /\$Revision:\s+([^\s]+)/;
 
 # NOTE: This is a documentation-only module.
 
+use strict;
+
 =head1 NAME
 
-Album - create and maintain HTML based photo albums
+Album - Create and maintain HTML based photo albums
 
 =head1 SYNOPSIS
 
@@ -58,3 +60,5 @@ GNU General Public License or the Artistic License for more details.
 =cut
 
 1;
+
+# $Id: Album.pm,v 1.2 2004/08/06 19:25:20 jv Exp $
