@@ -1,6 +1,6 @@
 package Album;
 
-( $VERSION ) = '$Revision: 1.2 $ ' =~ /\$Revision:\s+([^\s]+)/;
+( $VERSION ) = '$Revision: 1.4 $ ' =~ /\$Revision:\s+([^\s]+)/;
 
 # NOTE: This is a documentation-only module.
 
@@ -31,6 +31,11 @@ Images can be handled 'in situ', or imported from e.g. a CD-ROM or
 digital camera. Optionally, EXIF information from digital camera files
 can be taken into account.
 
+The photo albums are the digital equivalents of paper albums, but
+easier to create and maintain. Although you can publish a photo album
+on the Web, this tool is not specifically targeted at creating Web
+shows.
+
 =head1 DESCRIPTION
 
 For a description how to use the program, see L<Album::Tutorial>.
@@ -39,7 +44,7 @@ For a description how to use the program, see L<Album::Tutorial>.
 
 Johan Vromans (jvromans@squirrel.nl) wrote this module.
 
-Web site: http://www.squirrel.nl/people/jvromans/Album/index.html
+Web site: L<http://www.squirrel.nl/people/jvromans/Album/index.html>.
 
 =head1 COPYRIGHT AND DISCLAIMER
 
@@ -61,4 +66,4 @@ GNU General Public License or the Artistic License for more details.
 
 1;
 
-# $Id: Album.pm,v 1.2 2004/08/06 19:25:20 jv Exp $
+# $Id: Album.pm,v 1.4 2004/08/08 10:38:31 jv Exp $

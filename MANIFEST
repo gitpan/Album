@@ -10,3 +10,4 @@ t/basic.t
 MANIFEST
 Album.pm
 Album/Tutorial.pm
+META.yml                                 Module meta-data (added by MakeMaker)
