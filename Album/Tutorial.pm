@@ -1,6 +1,6 @@
 package Album::Tutorial;
 
-( $VERSION ) = '$Revision: 1.4 $ ' =~ /\$Revision:\s+([^\s]+)/;
+( $VERSION ) = '$Revision: 1.8 $ ' =~ /\$Revision:\s+([^\s]+)/;
 
 # NOTE: This is a documentation-only module.
 
@@ -209,15 +209,15 @@ Specifies the desired width for thumbnail images (B<--thumbsize>).
 
 =item B<!medium>
 
-Includes medium sized images (B<--medium>)
+Includes medium sized images (B<--medium>) of default size.
 
 =item B<!mediumsize> I<NNN>
 
-Specifies the desired width for medium sized images (B<--mediumsize>)
+Specifies the desired width for medium sized images (B<--mediumsize>).
 
 =item B<!tag> I<XXX>
 
-Sets the tag line for all subsequent images. Cancel with and empty
+Sets the tag line for all subsequent images. Cancel with an empty
 B<!tag> command.
 
 =item B<!caption>
@@ -227,7 +227,49 @@ sequence of B<f> (file name), B<s> (size, WxH), B<c> (caption), B<t>
 (tag line). If no B<!caption> has been used, the default value is
 B<fct>.
 
+=item B<!dateformat> I<XXX>
+
+Sets the default date format as used for the tag lines for new images.
+I<XXX> must be a valid strftime(2) date format string, for example:
+
+  !dateformat %a %e %B %Y
+
+=item B<!icon>
+
+Produce a file C<icon.jpg> to be used as an icon for this album
+(B<--icon>). The icon is of thumbnail size, and contains a small
+lookalike of the first index page.
+
+B<!icon> may be followed by a something true or false (B<--noicon>).
+Default is true.
+
+=item B<!locale> I<XXX>
+
+Set the locales for sorting and date formats to I<XXX>.
+
 =back
+
+B<album> can read values for settings from configuration files.
+Settings can be set as in C<info.dat>, the leading exclamation mark is
+optional in this case. By default, the configuration files used are
+C<.albumrc> in the current directory, and C<.albumrc> in the user's
+home directory. The order of precedence is:
+
+=over
+
+=item 1. command line options
+
+=item 2. C<info.dat>
+
+=item 3. user config file C<.albumrc> in current directory
+
+=item 4. user config file C<.albumrc> in the home directory
+
+=back
+
+Environment variable ALBUMCONFIG can be used to designate user
+config files. It should be set to a colon-separated list of file names
+to be processed in order of precedence.
 
 =head2 Importing new images
 
@@ -303,6 +345,27 @@ If you hover the mouse over the file name in the index page, or over
 the title on the image pages, a pop-up will show a selection of
 information from the EXIF data.
 
+=head2 Embedding other albums
+
+In the file 'info.dat' you can also enter names of HTML documents to
+refer to arbitrary other information you want to include in your
+album. You can use this to embed (more precisely: refer to) other
+albums. For example:
+
+  20040910/index.html  Pictures of an exhibition
+
+This will store in the album a reference to another album. If at the
+given location a file 'icon.jpg' exists, this will be used in the
+album as thumbnail image. To generate a sample icon for an album to be
+included, run the album program with command line option --icon.
+
+The reference will only be present on the index pages. When following
+the 'previous' and 'next' links of image pages, these references will
+be skipped.
+
+Note that when you click on an external reference thumbnail, a new
+browser window will be opened to show the referenced information.
+
 =head2 Additional notes
 
 The B<--clobber> command line option will force regeneration of all
@@ -345,4 +408,4 @@ GNU General Public License or the Artistic License for more details.
 
 1;
 
-# $Id: Tutorial.pm,v 1.4 2004/08/08 10:38:31 jv Exp $
+# $Id: Tutorial.pm,v 1.8 2004/09/19 16:42:55 jv Exp $

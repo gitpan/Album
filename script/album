@@ -1,16 +1,16 @@
 #!/usr/bin/perl -w
-my $RCS_Id = '$Id: album.pl,v 1.63 2004/08/29 11:15:48 jv Exp $ ';
+my $RCS_Id = '$Id: album.pl,v 1.72 2004/09/19 16:43:35 jv Exp $ ';
 
 # Author          : Johan Vromans
 # Created On      : Tue Sep 15 15:59:04 2002
 # Last Modified By: Johan Vromans
-# Last Modified On: Sun Aug 29 15:58:57 2004
-# Update Count    : 2071
+# Last Modified On: Sun Sep 19 18:37:22 2004
+# Update Count    : 2297
 # Status          : Unknown, Use with caution!
 
 ################ Common stuff ################
 
-$VERSION = 0.08;
+$VERSION = 0.09;
 
 use strict;
 
@@ -40,16 +40,19 @@ my $dest_dir = ".";
 my $info_file;
 my $linkthem = 1;		# link orig to large, if possible
 my $clobber = 0;
+my $mediumonly = 0;		# only medium size (for web export)
 my $verbose = 1;		# verbose processing
 
-# These are left undefined, for set_parameter_defaults.
-my $index_columns;
-my $index_rows;
-my $thumb;
-my $medium;			# medium size, between large and small
-my $mediumonly;			# only medium size (for web export)
-my $album_title;
-my $caption;
+# These are left undefined, for set_defaults. Note: our, not my.
+our $index_columns;
+our $index_rows;
+our $thumb;
+our $medium;			# medium size, between large and small
+our $album_title;
+our $caption;
+our $datefmt;
+our $icon;
+our $locale;
 
 # These are not command line options.
 my $journal;			# create journal
@@ -78,6 +81,8 @@ use constant DEFAULTS => { info       => "info.dat",
 			   indexcols  => 4,
 			   caption    => "fct",
 			   captionmin => "f",
+			   dateformat => '%F',
+			   icon	      => 0,
 			 };
 
 my $TMPDIR = $ENV{TMPDIR} || $ENV{TEMP} || '/usr/tmp';
@@ -125,6 +130,8 @@ use Time::Local;
 use Image::Info;
 use Image::Magick;
 use Data::Dumper;
+use POSIX qw(locale_h strftime);
+use locale;
 
 # The files already there, if any.
 my $gotlist = new FileList;
@@ -159,6 +166,8 @@ load_import() if $import_dir && -d $import_dir;
 # Apply defaults to unset parameters.
 set_defaults();
 
+warn("date => ", strftime($datefmt, localtime(time)), "\n");
+
 # Verify and update the file list.
 my $added = update_filelist();
 #print STDERR Data::Dumper->Dump([$filelist],[qw(filelist)]);
@@ -185,6 +194,7 @@ prepare_images();
 
 # Update cache.
 update_cache();
+my $cache_update = 0;
 
 my $entries_per_page = $index_columns*$index_rows;
 my $num_indexes = int(($num_entries - 1) / $entries_per_page) + 1;
@@ -238,9 +248,21 @@ for (my $i = $num_indexes ; ; $i++ ) {
 if ( $journal ) {
     print STDERR ("Creating ", $journal, " journal page",
 		  $journal == 1 ? "" : "s", "\n") if $verbose > 1;
+    mkpath([d_journal()], $verbose > 1);
     $mod = write_journal();
     uptodate("journal", $mod) if $verbose > 1;
 }
+
+if ( $icon ) {
+    print STDERR ("Creating index icon\n") if $verbose > 1;
+    unless ( indexicon() ) {
+	print STDERR ("(Index icon not modified)\n") if $verbose > 1;
+    }
+}
+
+# Final update, if needed.
+update_cache() if $cache_update;
+
 exit 0;
 
 ################ Subroutines ################
@@ -252,6 +274,7 @@ use constant T_VOICE => 3;	# still image + sound
 # Pseudo types.
 use constant T_TAG   => -1;
 use constant T_ANN   => -2;
+use constant T_REF   => -3;
 
 # List of possible subdirs to process.
 my @subdirs;
@@ -268,21 +291,105 @@ sub d_journal    { unshift(@_, "journal");    goto &d_dest; }
 sub d_dest       { unshift(@_, $dest_dir) unless $dest_dir eq ".";
 		   join("/", @_); }
 
+my %optcfg;			# option set from config files
+
+sub setopt {
+    no strict qw(refs);
+    return if defined(${$_[0]});
+    print STDERR ("setopt $_[0] -> $_[1]\n") if $trace;
+    ${$_[0]} = $_[1];
+    $optcfg{$_[0]} = 1;
+}
+
+sub parse_line {
+    local ($_) = (@_);
+    my $err = 0;
+
+    if ( /^!?\s*(\S.*)/ ) {
+	$_ = $1;
+	if ( /^title\s+(.*)/ ) {
+	    setopt("album_title", $1);
+	}
+	elsif ( /^page\s+(\d+)x(\d+)/ ) {
+	    setopt("index_rows", $1);
+	    setopt("index_columns", $2);
+	}
+	elsif ( /^thumbsize\s*(\d+)/ ) {
+	    setopt("thumb", $1);
+	}
+	elsif ( /^mediumsize\s*(\d+)/ ) {
+	    setopt("medium", $1);
+	}
+	elsif ( /^medium\s*(\d+)?/ ) {
+	    setopt("medium", $1 || DEFAULTS->{mediumsize});
+	}
+	elsif ( /^dateformat\s*(.*)/ ) {
+	    setopt("datefmt", $1);
+	}
+	elsif ( /^caption\s*(.*)/ ) {
+	    setopt("caption", $1);
+	}
+	elsif ( /^icon\s*(.*)/ ) {
+	    setopt("icon", defined($1) && length($1) ? $1 : 1);
+	}
+	elsif ( /^locale\s*(.*)/ ) {
+	    setopt("locale", $1);
+	}
+	else {
+	    warn("Unknown control: $_[0]\n");
+	    $err++;
+	}
+    }
+    else {
+	warn("Invalid control: $_[0]\n");
+	$err++;
+    }
+    $err;
+}
+
 sub set_defaults {
 
-    $album_title   ||= DEFAULTS->{title};
-    $index_rows    ||= DEFAULTS->{indexrows};
-    $index_columns ||= DEFAULTS->{indexcols};
-    $thumb         ||= DEFAULTS->{thumbsize};
-    $medium        ||= DEFAULTS->{medium};
+    # Load settings from user files.
+    my $sl = $ENV{ALBUMCONFIG} || ".albumrc:".$ENV{HOME}."/.albumrc";
+    foreach my $cf ( split(/:/, $sl) ) {
+	unless ( -f $cf ) {
+	    warn("$cf: $!\n") if $ENV{ALBUMCONFIG};
+	    next;
+	}
+	open(my $fh, "<$cf") || next;
+	warn("parsing: $cf\n") if $trace;
+	my $err = 0;
+	while ( <$fh> ) {
+	    next if /^\s*#/;
+	    next unless /\S/;
+	    $err += parse_line($_);
+	}
+	close($fh);
+	die("Errors in config file $cf, aborted\n") if $err;
+    }
+
+    # Finally, apply defaults if necessary.
+    warn("apply defaults\n") if $trace;
+    setopt("album_title",   DEFAULTS->{title});
+    setopt("index_rows",    DEFAULTS->{indexrows});
+    setopt("index_columns", DEFAULTS->{indexcols});
+    setopt("thumb",         DEFAULTS->{thumbsize});
+    setopt("datefmt",       DEFAULTS->{dateformat});
+    setopt("icon",          DEFAULTS->{icon});
+
+    $medium = DEFAULTS->{mediumsize} if defined($medium) && !$medium || $mediumonly;
 
     # Caption values.
-    $caption = DEFAULTS->{( -s $info_file || $import_dir) ?
-			  "caption" : "captionmin" }
-      unless defined($caption);
+    setopt("caption", DEFAULTS->{( -s $info_file || $import_dir) ?
+				 "caption" : "captionmin" });
     die("Invalid value for caption: $caption\n")
       unless $caption =~ /^[fsct]*$/i;
     $caption = lc($caption);
+
+    if ( $locale ) {
+	setlocale(LC_TIME, $locale);
+	setlocale(LC_COLLATE, $locale);
+    }
 }
 
 sub load_info {
@@ -312,38 +419,19 @@ sub load_info {
     my $err = 0;
     my $file;
     my $tag;
-    my $nexttag = 0;
-    my $annotation = "";
-    my $tags = 0;
 
     my $fh = do { local *FH; *FH };
     die("$info_file: $!\n")
       unless open($fh, $info_file);
+    warn("parsing: $info_file\n") if $trace;
 
     my $el;
     my %dirs;
-    local($/) = $/;
+
     while ( <$fh> ) {
 	chomp;
 
-	if ( /^#(.*)/ && $journal ) {
-	    $annotation .= " " . $1;
-	    next;
-	}
-
 	next if /^\s*#/;
-
-	if ( !/\S/ && $journal && $annotation ) {
-	    $el = new ImageInfo;
-	    $el->annotation($annotation);
-	    $el->tag($tag);
-	    $el->type(T_ANN);
-	    push(@journal, $el);
-	    $annotation = "";
-	    undef $el;
-	    next;
-	}
-
 	next unless /\S/;
 
 	if ( /^\s+/ && $el ) {
@@ -353,63 +441,26 @@ sub load_info {
 
 	if ( /^!\s*(\S.*)/ ) {
 	    $_ = $1;
-	    if ( /^title\s+(.*)/ ) {
-		$album_title ||= $1;
-	    }
-	    elsif ( /^page\s+(\d+)x(\d+)/ ) {
-		$index_rows ||= $1;
-		$index_columns ||= $2;
-	    }
-	    elsif ( /^thumbsize\s*(\d+)/ ) {
-		$thumb ||= $1;
-	    }
-	    elsif ( /^mediumsize\s*(\d+)/ ) {
-		$medium = $1;
-	    }
-	    elsif ( /^medium\s*(\d+)?/ ) {
-		$medium = $1 || DEFAULTS->{mediumsize};
-	    }
-	    elsif ( /^tag\s*(.*)/ ) {
+	    if ( /^tag\s*(.*)/ ) {
 		$tag = $1;
 		$tag =~ s/\s$//;
 		$tag =~ s/\s+/ /g;
-		if ( $journal ) {
-		    if ( $tag !~ /\S/ ) {
-			warn("Tag may not be empty\n");
-			$err++;
-			next;
-		    }
-		    if ( exists($jnltags{$tag}) ) {
-			warn("Tag \"$tag\" is not unique\n");
-			$err++;
-		    }
-		    $jnltags{$tag} = sprintf("%04d", ++$nexttag);
-		    $el = new ImageInfo;
-		    $el->tag($tag);
-		    $el->type(T_TAG);
-		    push(@journal, $el);
-		    $tags++;
-		    undef $el;
-		}
-	    }
-	    elsif ( /^caption\s*(.*)/ ) {
-		$caption ||= $1;
-	    }
-	    elsif ( /^journal\s*(.*)/ ) {
-		if ( $filelist->tally ) {
-		    warn("\"!journal\" must precede image info\n");
-		    $err++;
-		}
-		$journal++;
 	    }
 	    elsif ( /^subdirs\s*(.*)/ ) {
 		foreach ( split(' ', $1)) {
 		    $dirs{$_}++;
 		}
 	    }
+	    elsif ( /^journal\s*(.*)/ ) {
+		if ( $filelist->tally ) {
+		    warn("\"!journal\" must precede image info\n");
+		    $err++;
+		}
+		load_info_journal($err, $fh);
+		return;
+	    }
 	    else {
-		warn("Unknown control: !$_\n");
-		$err++;
+		$err += parse_line("!".$_);
 	    }
 	    next;
 	}
@@ -417,9 +468,17 @@ sub load_info {
 
 	my $rotate;
 	my $type = T_JPG;
+	my $assc;
 	while ( $a && $a =~ /^-(\w):(\S+)\s*(.*)/ ) {
 	    if ( lc($1) eq 'o' ) {
 		$rotate = 90 * ($2 % 4);
+	    }
+	    elsif ( lc($1) eq 'i' ) {
+		$assc = basename($file)."/".$2;
+		unless ( -s $assc && -r _ ) {
+		    warn("$file (info): $assc [$!]\n");
+		    undef $assc;
+		}
 	    }
 	    elsif ( lc($1) eq 't' ) {
 		$type = $typemap{lc($2)}
@@ -431,13 +490,6 @@ sub load_info {
 	$el->type($type);
 	$el->description($a) if $a;
 	$el->tag($tag) if $tag;
-	if ( $annotation ) {
-	    $annotation =~ s/^\s+//;
-	    $annotation =~ s/\s+$//;
-	    $annotation =~ s/\s+/ /g;
-	    $el->annotation($annotation);
-	    $annotation = "";
-	}
 	$el->_rotation($rotate) if defined($rotate);
 	if ( $file =~ /^(.+)\.mpg$/i ) {
 	    $el->type(T_MPG);
@@ -447,9 +499,162 @@ sub load_info {
 	    (my $t = $file) =~ s/\.jpg$/.mp3/i;
 	    $el->assoc_name($t);
 	}
+	elsif ( $file =~ /.\.html?$/i ) {
+	    $type = T_REF;
+	}
+	if ( $type == T_REF ) {
+	    for ( dirname($file)."/icon.jpg" ) {
+		$assc = $_ if !defined $assc && -f $_;
+	    }
+	    $assc = "icons/extern.jpg" unless defined $assc;
+	    $el->assoc_name($assc);
+	    $el->dest_name($file);
+	    $el->type($type);
+	}
 	$filelist->add($el);
-	push(@journal, $el) if $journal && $a !~ /^--/;
-	$dirs{$1} = 1 if $file =~ m;^(.+)/[^/]+$;;
+	$dirs{$1} = 1 if $type != T_REF && $file =~ m;^(.+)/[^/]+$;;
+    }
+    close($fh);
+    die("Aborted\n") if $err;
+    @subdirs = sort(keys(%dirs));
+}
+
+sub load_info_journal {
+    my $err = shift;
+    my $fh = shift;
+
+    #### WARNING: EXPERIMENTAL ####
+
+    warn("parsing (journal mode)\n") if $trace;
+
+    my %typemap = ( 'p' => T_JPG, 'm' => T_MPG, 'v' => T_VOICE );
+
+    my $tag;
+    my $nexttag = 0;
+    my $annotation = "";
+    my $tags = 0;
+    my %dirs;
+    local($/) = "";		# para mode
+    while ( <$fh> ) {
+	chomp;
+	next if /^\s*#/;
+	next unless /\S/;
+
+	# Handle controls.
+	if ( /^!\s*(\S.*)/ ) {
+	    $_ = $1;
+	    if ( /^tag\s*(.*)/ ) {
+		$tag = $1;
+		$tag =~ s/\s$//;
+		$tag =~ s/\s+/ /g;
+
+		if ( $tag !~ /\S/ ) {
+		    warn("Tag may not be empty\n");
+		    $err++;
+		    next;
+		}
+		if ( exists($jnltags{$tag}) ) {
+		    warn("Tag \"$tag\" is not unique\n");
+		    $err++;
+		}
+		$jnltags{$tag} = sprintf("%04d", ++$nexttag);
+		my $el = new ImageInfo;
+		$el->tag($tag);
+		$el->type(T_TAG);
+		push(@journal, $el);
+		$tags++;
+	    }
+	    elsif ( /^subdirs\s*(.*)/ ) {
+		foreach ( split(' ', $1)) {
+		    $dirs{$_}++;
+		}
+	    }
+	    elsif ( /^journal\s*(.*)/ ) {
+		if ( $filelist->tally ) {
+		    warn("\"!journal\" must precede image info\n");
+		    $err++;
+		}
+		# Ignore.
+	    }
+	    else {
+		$err += parse_line("!".$_);
+	    }
+	    next;
+	}
+
+	if ( /^\*\s*(.*)/s ) {
+	    $_ = $1;
+	}
+	else {
+	    my $el = new ImageInfo;
+	    $el->annotation($_);
+	    $el->tag($tag);
+	    $el->type(T_ANN);
+	    push(@journal, $el);
+	    next;
+	}
+	s/\s*\n\s+/ /g;
+	my @a = split(/\n/, $_);
+	$_ = shift(@a);
+	my $annotation = join(" ", @a);
+	my ($file, $a) = split(' ', $_, 2);
+
+	my $rotate;
+	my $type = T_JPG;
+	my $assc;
+	while ( $a && $a =~ /^-(\w):(\S+)\s*(.*)/ ) {
+	    if ( lc($1) eq 'o' ) {
+		$rotate = 90 * ($2 % 4);
+	    }
+	    elsif ( lc($1) eq 'i' ) {
+		$assc = basename($file)."/".$2;
+		unless ( -s $assc && -r _ ) {
+		    warn("$file (info): $assc [$!]\n");
+		    undef $assc;
+		}
+	    }
+	    elsif ( lc($1) eq 't' ) {
+		$type = $typemap{lc($2)}
+		  or warn("$file (info): Illegal type: $2\n"), $err++;
+	    }
+	    $a = $3;
+	}
+	my $el = new ImageInfo($file);
+	$el->type($type);
+	$el->description($a) if $a;
+	$el->tag($tag) if $tag;
+	# $annotation ||= $a;
+	if ( $annotation ) {
+	    $annotation =~ s/^\s+//;
+	    $annotation =~ s/\s+$//;
+	    $annotation =~ s/\s+/ /g;
+	    $el->annotation($annotation);
+	}
+
+	$el->_rotation($rotate) if defined($rotate);
+	if ( $file =~ /^(.+)\.mpg$/i ) {
+	    $el->type(T_MPG);
+	    $el->assoc_name($1."s.jpg"); # associates still image
+	}
+	elsif ( $type == T_VOICE ) {
+	    (my $t = $file) =~ s/\.jpg$/.mp3/i;
+	    $el->assoc_name($t);
+	}
+	elsif ( $file =~ /.\.html?$/i ) {
+	    $type = T_REF;
+	}
+	if ( $type == T_REF ) {
+	    for ( dirname($file)."/icon.jpg" ) {
+		$assc = $_ if !defined $assc && -f $_;
+	    }
+	    $assc = "icons/extern.jpg" unless defined $assc;
+	    $el->assoc_name($assc);
+	    $el->dest_name($file);
+	    $el->type($type);
+	}
+	$filelist->add($el);
+	push(@journal, $el) if $a !~ /^--/;
+	$dirs{$1} = 1 if $type != T_REF && $file =~ m;^(.+)/[^/]+$;;
     }
     close($fh);
     die("Aborted\n") if $err;
@@ -610,6 +815,7 @@ sub update_filelist {
     my $el;
     my %seen;
     my $missing;
+    my $prev;
 
     foreach $el ( $filelist->entries ) {
 	my $f = $el->dest_name;
@@ -622,6 +828,10 @@ sub update_filelist {
 	elsif ( $entry = $implist->byname($f) ) {
 	    print STDERR (" -- imp") if $trace;
 	}
+	elsif ( $el->type == T_REF ) {
+	    $entry = $el;
+	    print STDERR (" -- ref") if $trace;
+	}
 	if ( $entry ) {
 	    unless ( $el->description =~ /^--($|\s)/ ) {
 		# Copy properties from info.
@@ -629,20 +839,31 @@ sub update_filelist {
 		$entry->description($el->description);
 		$entry->annotation($el->annotation);
 		$entry->_rotation($el->_rotation);
+		# Add and create prev/next links.
+		$entry->prev($prev->seq) if $prev;
 		$todo->add($entry);
+		$prev->next($entry->seq) if $prev;
 		print STDERR ("\n") if $trace;
 	    }
 	    else {
 		print STDERR (" (ignored)\n") if $trace;
+		undef $entry;
 	    }
 	}
-	elsif ( $trace ) {
-		print STDERR ("\n");
-	}
 	else {
-	    print STDERR ("todo[inf]: $f -- missing\n");
-	    $missing++;
+	    if ( $trace ) {
+		print STDERR ("\n");
+	    }
+	    else {
+		unless ( $el->description =~ /^--($|\s)/ ) {
+		    print STDERR ("todo[inf]: $f -- missing\n");
+		}
+	    }
+	    unless ( $el->description =~ /^--($|\s)/ ) {
+		$missing++;
+	    }
 	}
+	$prev = $entry if $entry && $entry->type != T_REF;
     }
     die("Aborted!\n") if $missing;
 
@@ -665,8 +886,9 @@ sub update_filelist {
 	print STDERR (" -- added\n") if $trace;
 	my $nd = "";
 	if ( $f =~ /^(\d{4})(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)/ ) {
-	    $nd = "$3/$2/$1";
-	    $el->timestamp(timelocal($6,$5,$4,$3,$2-1,$1));
+	    my $tl = timelocal($6,$5,$4,$3,$2-1,$1);
+	    $nd = strftime($datefmt, localtime($tl));
+	    $el->timestamp($tl);
 	}
 	if ( !defined($date) || $nd ne $date ) {
 	    $newinfo .= "\n!tag $nd\n";
@@ -674,7 +896,10 @@ sub update_filelist {
 	}
 	$newinfo .= $f . "\n";
 	$el->tag($date) if $date;
+	$el->prev($prev->seq) if $prev;
 	$todo->add($el);
+	$prev->next($el->seq) if $prev;
+	$prev = $el unless $el->type == T_REF;
 	push(@journal, $el) if $journal;
 	$new++;
     }
@@ -690,8 +915,7 @@ sub update_filelist {
 	my $nd = "";
 	my $time = $el->timestamp;
 	if ( $time ) {
-	    my @tm = localtime($time);
-	    $nd = sprintf("%02d/%02d/%04d", $tm[3], 1+$tm[4], 1900+$tm[5]);
+	    $nd = strftime($datefmt, localtime($time));
 	}
 	if ( !defined($date) || $nd ne $date ) {
 	    $newinfo .= "\n!tag $nd\n";
@@ -702,7 +926,10 @@ sub update_filelist {
 	    ($el->type == T_VOICE ? "-T:V " : "") .
 	      " \n";
 	$el->tag($date) if $date;
+	$el->prev($prev->seq) if $prev;
 	$todo->add($el);
+	$prev->next($el->seq) if $prev;
+	$prev = $el unless $el->type == T_REF;
 	push(@journal, $el) if $journal;
 	$new++;
     }
@@ -733,14 +960,17 @@ sub update_filelist {
 	print $fh ("# album control file created by $my_name $my_version, ".
 	       localtime(time), "\n\n");
 	print $fh ("!title $album_title\n") if $album_title;
-	print $fh ("!medium\n") if $medium;
-	print $fh ("!mediumsize $medium\n")
-	  if $medium && $medium != DEFAULTS->{mediumsize};
+	if ( $medium && !$optcfg{"medium"} ) {
+	    print $fh ($medium != DEFAULTS->{mediumsize} ?
+		       "!mediumsize $medium\n" : "!medium\n");
+	}
 	print $fh ("!thumbsize $thumb\n")
-	  if $thumb != DEFAULTS->{thumbsize};
+	  if !$optcfg{"thumb"} && $thumb != DEFAULTS->{thumbsize};
 	print $fh ("!page ${index_rows}x${index_columns}\n")
-	  if $index_rows != DEFAULTS->{indexrows}
-	      || $index_columns != DEFAULTS->{indexcols};
+	  if !$optcfg{index_rows} && $index_rows != DEFAULTS->{indexrows}
+	      || !$optcfg{index_columns} && $index_columns != DEFAULTS->{indexcols};
+	print $fh ("!caption $caption\n")
+	  if !$optcfg{"caption"} && $caption ne DEFAULTS->{caption};
     }
     print $fh ("\n# New entries added by $my_name $my_version, ".
 	       localtime(time), "\n",
@@ -849,6 +1079,7 @@ sub prepare_images {
 =cut
 
     foreach my $el ( $filelist->entries ) {
+	$msg->(), next unless $el->type > 0;
 	my $file = $el->dest_name;
 	$msgfile = $file;
 	$image = undef;
@@ -856,7 +1087,7 @@ sub prepare_images {
 	# Check for directory names, e.g. f01/p01.jpg.
 	my $dn = dirname($file);
 	if ( $dn && $dn ne "." ) { # we have a dir name.
- 	    mkpath([d_thumbnails($dn), d_large($dn)], 1);
+	    mkpath([d_thumbnails($dn), d_large($dn)], 1);
 	    mkpath([d_medium($dn)], 1) if $medium;
 	}
 
@@ -961,7 +1192,6 @@ sub prepare_images {
 	    $msg->($t) if $t;
 	}
 
-#	$msg->("test ") if $ddot == 47;
 	$msg->(); 		# flush
 
     }
@@ -977,6 +1207,8 @@ sub ixname($);
 sub write_image_page {
     my ($el, $dir) = @_;
 
+    return unless $el->type > 0;
+
     my $i = $el->seq - 1;
     my $file = $el->dest_name;
     my $rf = $file;
@@ -990,15 +1222,22 @@ sub write_image_page {
     my $tt = "$album_title: Image " . ($i+1);
     $tt .= " of " . $num_entries if $num_entries > 1;
     $tt = html($tt);
-    my $it = html($el->description) || $tt;
+    my $it = html($el->description);
+    unless ( $it ) {
+	$it = $tt;
+	$tt = "";
+    }
+
+    my $next = ($el->next || $num_entries+1) - 1;
+    my $prev = ($el->prev || 0) - 1;
 
     my $b = join("$br\n",
 		 ($dir eq "large" && $medium) ?
 		 button("medium", "../medium/".$htmllist[$i],              1, 1) :
 		 button("index",  "../".ixname(int($i/$entries_per_page)), 1, 1),
 		 button("first",  $htmllist[0],                            1, $i > 0),
-		 button("prev",   $htmllist[$i-1],                         1, $i > 0),
-		 button("next",   $htmllist[$i+1],                         1, $i < $num_entries-1),
+		 button("prev",   $htmllist[$prev] || "",                  1, $prev >= 0),
+		 button("next",   $htmllist[$next] || "",                  1, $next < $num_entries),
 		 button("last",   $htmllist[-1],                           1, $i < $num_entries-1));
 
     if ( $journal ) {
@@ -1171,14 +1410,25 @@ sub write_index_page {
 		if ( $this < $num_entries ) {
 		    my $el = $filelist->byseq($this+1);
 		    my $file = $el->dest_name;
-		    my $img = $el->type == T_MPG ? $el->assoc_name : $file;
-		    my $base = $medium ? "medium/" : "large/";
-		    $base .= $htmllist[$this];
+		    my $img;
+		    my $base;
+		    my $target = "";
+		    if ( $el->type == T_REF ) {
+			$img = $el->assoc_name;
+			$base = $el->orig_name;
+			$target = " target=\"_blank\"";
+		    }
+		    else {
+			$img = $el->type == T_MPG ? $el->assoc_name : $file;
+			$img = "thumbnails/$img";
+			$base = $medium ? "medium/" : "large/";
+			$base .= $htmllist[$this];
+		    }
 		    $cc .= "    <td align='center' valign='bottom'>\n".
 			  "      <table border='0' cellpadding='0' cellspacing='0' bgcolor='$LGREY'>\n".
 			  "        <tr>\n".
 			  "          <td align='center'>\n".
-			  "            <a href='$base'>".img("thumbnails/$img", alt => "[Click for bigger image]", border => 0)."</a>\n".
+			  "            <a href='$base'$target>".img($img, alt => "[Click for bigger image]", border => 0)."</a>\n".
 			  "          </td>\n".
 			  "        </tr>\n".
 			  "        <tr>\n".
@@ -1276,13 +1526,14 @@ sub write_journal {
 
 	    # We cannot use $el->seq, since that's the info.dat order
 	    # which and includes the skipped entries.
-	    my $dst = $e->type == T_MPG ? $e->assoc_name : $e->dest_name;
+	    my $dst = ($e->type == T_MPG || $e->type == T_REF) ? $e->assoc_name : d_thumbnails($e->dest_name);
 	    my $img = "<a name='" . sprintf("img%04d", $seq) . "' " .
+	              ($e->type == T_REF ? " target=\"_blank\"" : "").
 		      "href='../" .
-		      d_medium(sprintf("img%04d.html", $seq)) .
+		      ($e->type == T_REF ? $e->dest_name : d_medium(sprintf("img%04d.html", $seq))) .
 		      "' border='0'>" .
 		      "<img src='../" .
-		      d_thumbnails($dst) . "'></a>";
+		      $dst . "'></a>";
 
 	    $jnl .= "<tr>\n".
 	            "  <td valign='middle' align='left'>\n".
@@ -1371,12 +1622,12 @@ sub button($$;$$) {
     $active ? "<a class='info' href='$link' alt='[$Tag]'>$b</a>" : $b;
 }
 
-# These are to aid XHTML compliancy.
 sub ixname($) {
     my ($x) = @_;
     "index" . ($x ? $x : "") . ".html";
 }
 
+# These are to aid XHTML compliancy.
 sub br {
     "<br>";
 }
@@ -1790,6 +2041,49 @@ sub copy_voice {
     utime($time, $time, $new);
 }
 
+sub indexicon {
+
+    my @imgs;
+    for ( my $i = 0; $i < $index_rows*$index_columns; $i++ ) {
+	next if $i >= $num_entries;
+	my $el = $filelist->byseq($i+1);
+	my $file = $el->dest_name;
+	my $img;
+	if ( $el->type == T_REF ) {
+	    $img = $el->assoc_name;
+	}
+	else {
+	    $img = $el->type == T_MPG ? $el->assoc_name : $file;
+	    $img = "thumbnails/$img";
+	}
+	push(@imgs, $img);
+    }
+
+    my $iconfile = "icon.jpg";
+    my $ii = cache_entry(" indexicon ");
+    if ( -f $iconfile && $ii && $ii->dest_name eq "@imgs" ) {
+	return 0;
+    }
+    my $el = new ImageInfo($iconfile);
+    $el->dest_name("@imgs");
+    cache_entry(" indexicon ", $el);
+    $cache_update++;
+
+    my $image = new Image::Magick->new;
+    foreach ( @imgs ) {
+	$image->Read($_);
+    }
+
+    my $width = $thumb;
+    my $height = int($thumb*0.75);
+
+    $image = $image->Montage(tile=>"${index_columns}x${index_rows}",
+			     texture=>"xc:gray90");
+    $image->Resize(geometry=>"${width}x${height}");
+    $image->Write($iconfile);
+    1;
+}
+
 ################ Subroutines ################
 
 sub app_options {
@@ -1801,29 +2095,35 @@ sub app_options {
     return unless @ARGV > 0;
 
     if ( !GetOptions(
-		     'import=s'	=> \$import_dir,
-		     'exif'	=> \$import_exif,
-		     'dcim=s'	=> sub { $import_dir = $_[1]; $import_exif++ },
-		     'update'   => \$update,
-		     'info=s'	=> \$info_file,
-		     'cols=i'	=> \$index_columns,
-		     'rows=i'	=> \$index_rows,
-		     'thumbsize=i' => \$thumb,
-		     'medium'   => sub { $medium = 0 },
-		     'mediumsize:i' => \$medium,
-		     'mediumonly' => \$mediumonly,
-		     'title=s'	=> \$album_title,
-		     'clobber'	=> \$clobber,
-		     'link!'	=> \$linkthem,
-		     'caption=s' => \$caption,
-		     'ident'	=> \$ident,
-		     'quiet'	=> sub { $verbose = 0 },
-		     'verbose+'	=> \$verbose,
-		     'trace'	=> \$trace,
-		     'test'	=> \$test,
-		     'help|?'	=> \$help,
-		     'debug'	=> \$debug,
-		    )
+	# Run time options.
+	'clobber'        => \$clobber,
+	'dcim=s'         => sub { $import_dir = $_[1]; $import_exif++ },
+	'exif'           => \$import_exif,
+	'import=s'       => \$import_dir,
+	'info=s'         => \$info_file,
+	'link!'          => \$linkthem,
+	'update'         => \$update,
+	'mediumonly'     => \$mediumonly,
+
+        # Album options. Can also be set in info/config files.
+	'caption=s'      => \$caption,
+	'cols|columns=i' => \$index_columns,
+	'icon!'          => \$icon,
+	'medium'         => sub { $medium = 0 },
+	'mediumsize=i'   => \$medium,
+	'rows=i'         => \$index_rows,
+	'thumbsize=i'    => \$thumb,
+	'title=s'        => \$album_title,
+
+	# Miscellaneous.
+	'debug'          => \$debug,
+	'help|?'         => \$help,
+	'ident'          => \$ident,
+	'quiet'          => sub { $verbose = 0 },
+	'test'           => \$test,
+	'trace'          => \$trace,
+	'verbose+'       => \$verbose,
+        )
 	 or $help
 	 or @ARGV > 1
 	 or @ARGV && ! -d $ARGV[0]
@@ -1835,7 +2135,6 @@ sub app_options {
     app_ident() if $ident;
     $dest_dir = @ARGV ? shift(@ARGV) : ".";
     $dest_dir =~ s;^\./;;;
-    $medium = DEFAULTS->{mediumsize} if defined($medium) && !$medium || $mediumonly;
     if ( $import_dir ) {
 	die("$import_dir: Not a directory\n")
 	  unless -d $import_dir;
@@ -1855,19 +2154,22 @@ Usage: $0 [options] [ directory ]
   Album:
     --info XXX		description file, default "@{[DEFAULTS->{info}]}" (if it exists)
     --title XXX		album title, default "@{[DEFAULTS->{title}]}"
+    --[no]icon		[do not] produce an album icon
   Index:
     --cols NN		number of columns per page, default @{[DEFAULTS->{indexcols}]}
     --rows NN		number of rows per page, default @{[DEFAULTS->{indexrows}]}
     --thumbsize NNN	the max size of thumbnail images, default @{[DEFAULTS->{thumbsize}]}
     --captions XXX	f: filename s: size c: description t: tag
   Medium:
-    --medium [ NNN ]	the max size of medium sized images, default @{[DEFAULTS->{mediumsize}]}
+    --medium    	produce medium sized images of size @{[DEFAULTS->{mediumsize}]}
+    --mediumsize NNN	the max size of medium sized images, default @{[DEFAULTS->{mediumsize}]}
+    --mediumonly	ignore large images and links (for web export)
   Importing:
     --import XXX	original images
     --exif		use w/ EXIF info, if possible
     --dcim XXX		as --import with --exif
     --update		add new entries from import, if needed
-    --[no]link		do [not] link large to original. Default is link.
+    --[no]link		[do not] link to original, instead of copying. Default is link.
   Miscellaneous:
     --clobber		recreate everything (except large)
     --test		verify only
@@ -1887,7 +2189,7 @@ my @exif_fields;
 my $exif_rot;
 
 INIT {
-    @std_fields  = qw(type seq
+    @std_fields  = qw(type seq next prev
 		      dest_name orig_name assoc_name
 		      timestamp file_size medium_size
 		      tag description annotation

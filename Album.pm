@@ -1,6 +1,6 @@
 package Album;
 
-( $VERSION ) = '$Revision: 1.6 $ ' =~ /\$Revision:\s+([^\s]+)/;
+( $VERSION ) = '$Revision: 1.7 $ ' =~ /\$Revision:\s+([^\s]+)/;
 
 # NOTE: This is a documentation-only module.
 
@@ -14,7 +14,9 @@ Album - Create and maintain HTML based photo albums
 
 A photo album consists of a number of (large) pictures, small thumbnail
 images, and index pages. Optionally, medium sized images can be
-generated as well. The album will be organised as follows:
+generated as well. Also, it is possible to embed other albums.
+
+The album will be organised as follows:
 
   index.html       first or only index page
   indexN.html      subsequent index pages (N = 1, 2, ...)
@@ -106,4 +108,4 @@ GNU General Public License or the Artistic License for more details.
 
 1;
 
-# $Id: Album.pm,v 1.6 2004/08/30 08:08:33 jv Exp $
+# $Id: Album.pm,v 1.7 2004/09/15 20:27:24 jv Exp $
