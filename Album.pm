@@ -1,6 +1,6 @@
 package Album;
 
-( $VERSION ) = '$Revision: 1.4 $ ' =~ /\$Revision:\s+([^\s]+)/;
+( $VERSION ) = '$Revision: 1.6 $ ' =~ /\$Revision:\s+([^\s]+)/;
 
 # NOTE: This is a documentation-only module.
 
@@ -40,6 +40,46 @@ shows.
 
 For a description how to use the program, see L<Album::Tutorial>.
 
+=head1 DEPENDENCIES
+
+B<Album> requires the following Perl modules, all available on CPAN:
+
+=over 4
+
+=item *
+
+Image::Info
+
+=item *
+
+Image::Magick (PerlMagick). Of course, this requires an ImageMagick
+install as well.
+
+=back
+
+The following tools / packages will be used if available:
+
+=over 4
+
+=item *
+
+jpegtrans, a tool for lossless JPEG rotation
+
+=item *
+
+mplayer, to manipulate MPEG movies and VOICE images
+
+=item *
+
+mencoder, to manipulate MPEG movies
+
+=back
+
+=head1 BUGS AND PROBLEMS
+
+Some versions of Perl may exhibit Data::Dumper problems with non-ASCII
+data. Perl 5.6.x and 5.8.3 and later should be fine.
+
 =head1 AUTHOR AND CREDITS
 
 Johan Vromans (jvromans@squirrel.nl) wrote this module.
@@ -66,4 +106,4 @@ GNU General Public License or the Artistic License for more details.
 
 1;
 
-# $Id: Album.pm,v 1.4 2004/08/08 10:38:31 jv Exp $
+# $Id: Album.pm,v 1.6 2004/08/30 08:08:33 jv Exp $
