@@ -1,4 +1,17 @@
-Tutorial.
+# $Id: Tutorial.pm,v 1.1 2004/08/05 20:46:00 jv Exp $
+
+=pod
+
+=head1 NAME
+
+Album::Tutorial - How to use the Album program
+
+=head1 SYNOPSIS
+
+This tutorial describes the basic use of the Album program to create
+and maintain HTML based photo albums.
+
+=head1 DESCRIPTION
 
 To get started, create a new directory and cd to it. Create a
 subdirectory 'large' and put some pictures there. If you have
@@ -237,3 +250,25 @@ small chance that the EXIF information would lead to identical file
 names. This can only happen if the pictures were taken at the exact
 same time (according to the camera's notion of time!), and have the
 same internal sequence number.
+
+=head1 AUTHOR AND CREDITS
+
+Johan Vromans (jvromans@squirrel.nl) wrote this module.
+
+=head1 COPYRIGHT AND DISCLAIMER
+
+This program is Copyright 2004 by Squirrel Consultancy. All
+rights reserved.
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of either: a) the GNU General Public License as
+published by the Free Software Foundation; either version 1, or (at
+your option) any later version, or b) the "Artistic License" which
+comes with Perl.
+
+This program is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See either the
+GNU General Public License or the Artistic License for more details.
+
+=cut
