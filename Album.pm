@@ -1,6 +1,6 @@
 package Album;
 
-( $VERSION ) = '$Revision: 1.7 $ ' =~ /\$Revision:\s+([^\s]+)/;
+( $VERSION ) = '$Revision: 1.8 $ ' =~ /\$Revision:\s+([^\s]+)/;
 
 # NOTE: This is a documentation-only module.
 
@@ -8,7 +8,7 @@ use strict;
 
 =head1 NAME
 
-Album - Create and maintain HTML based photo albums
+Album - Create and maintain browser based photo albums
 
 =head1 SYNOPSIS
 
@@ -21,6 +21,7 @@ The album will be organised as follows:
   index.html       first or only index page
   indexN.html      subsequent index pages (N = 1, 2, ...)
   icons/           directory with navigation icons
+  css/		   directory with stylesheets
   large/           original (large) images, with HTML pages
   medium/          optional medium sized images, with HTML pages
   thumbnail/       thumbnail images
@@ -108,4 +109,4 @@ GNU General Public License or the Artistic License for more details.
 
 1;
 
-# $Id: Album.pm,v 1.7 2004/09/15 20:27:24 jv Exp $
+# $Id: Album.pm,v 1.8 2004/11/21 10:34:59 jv Exp $

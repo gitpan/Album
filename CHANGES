@@ -1,0 +1,8 @@
+Version 1.01, Sun Nov 21 11:29:10 CET 2004
+
+ * Album now uses style sheets (CSS) for most formatting, making
+   it easy to customize the appearance of the pages.
+
+Version 1.00, Sun Oct  3 16:40:34 CET 2004
+
+ * First official release after a long period of beta tests.
