@@ -9,6 +9,6 @@ helper/Makefile
 Makefile.PL
 t/basic.t
 MANIFEST
-Album.pm
-Album/Tutorial.pm
+lib/Album.pm
+lib/Album/Tutorial.pm
 META.yml                                 Module meta-data (added by MakeMaker)

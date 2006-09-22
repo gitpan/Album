@@ -20,8 +20,7 @@ mountc :
 	-mount $(CAMERA)
 
 _fetch :
-	rsync -av --modify-window=1 \
-	    --exclude=dsc00000.jpg \
+	rsync -av --modify-window=1 --exclude=dsc00000.jpg \
 	    $(DSC)/ $(RAW)/
 	find $(RAW) -type f -perm +333 -print -exec chmod 0444 {} \;
 
@@ -35,9 +34,9 @@ clobber :
 	$(PERL) -w $(TOOLS)/album.pl $(OPTS) --verbose --clobber --update $(IMPORT) $(HERE)
 
 export-web :
-	$(PERL) -w $(TOOLS)/album.pl $(OPTS) --verbose --mediumonly $(HERE)
+	$(PERL) -w $(TOOLS)/album.pl $(OPTS) --verbose --mediumonly --caption=tc $(HERE)
 	rm -f web.zip
-	zip -r web.zip index*.html icons medium thumbnails journal
+	zip -r web.zip index*.html icons css medium thumbnails journal
 
 init ::
 	mkdir -p $(DCIM)
@@ -48,6 +47,16 @@ init ::
 		dir="`basename \`pwd\``"; \
 		touch $(DATA)/$$dir.dat; \
 		ln -s $(DATA)/$$dir.dat info.dat; \
+		echo "!title $$dir" > info.dat; \
+	}
+
+init-nolinks ::
+	mkdir -p $(DCIM)
+	cp $(TOOLS)/shellrun.exe .
+	cp $(TOOLS)/autorun.inf .
+	test -f Makefile || cp $(TOOLS)/generic.mk Makefile
+	test -f info.dat || { \
+		dir="`basename \`pwd\``"; \
 		echo "!title $$dir" > info.dat; \
 	}
 
