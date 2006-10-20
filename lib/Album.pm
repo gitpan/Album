@@ -1,6 +1,6 @@
 package Album;
 
-( $VERSION ) = '$Revision: 1.8 $ ' =~ /\$Revision:\s+([^\s]+)/;
+( $VERSION ) = '$Revision: 1.9 $ ' =~ /\$Revision:\s+([^\s]+)/;
 
 # NOTE: This is a documentation-only module.
 
@@ -113,4 +113,4 @@ GNU General Public License or the Artistic License for more details.
 
 1;
 
-# $Id: Album.pm,v 1.8 2004/11/21 10:34:59 jv Exp $
+# $Id: Album.pm,v 1.9 2006/10/20 14:47:56 jv Exp $

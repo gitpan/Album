@@ -1,4 +1,14 @@
-Version 1.03,
+Version 1.04,
+
+* Install Album and, more important, Album::Tutorial.
+
+* Allow file names with spaces and other uglyness.
+
+* Allow avi and mov file extensions for movies.
+
+* Allow non-DCF filenames in the import area.
+
+Version 1.03,Thu Sep 21 15:46:00 CET 2006
 
 * Keyboard navigation for web pages.
 

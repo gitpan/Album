@@ -2,8 +2,8 @@
 # Author          : Johan Vromans
 # Created On      : Fri Jul  9 15:45:48 2004
 # Last Modified By: Johan Vromans
-# Last Modified On: Fri Sep 15 19:15:34 2006
-# Update Count    : 22
+# Last Modified On: Sat Sep 23 17:45:29 2006
+# Update Count    : 24
 # Status          : Experimental
 
 use strict;
@@ -63,7 +63,6 @@ WriteMakefile
 		     'File::Spec' => 0,
 		   },
    EXE_FILES    => [ map { "script/$_" } @scripts ],
-   PM		=> {},
  );
 
 sub checkexec {
