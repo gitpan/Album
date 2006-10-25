@@ -1,4 +1,14 @@
-Version 1.04,
+Version 1.05,
+
+* Several file naming fixes for Windows. Thanks to Slaven Rezic and
+  Aldo Calpini for being guinea pigs.
+
+* Do not copy movies unless they require rotation. Link them if
+  possible.
+
+* Album should now be fully functional on Windows platforms.
+
+Version 1.04, Fri Oct 20 16:48:60 CET 2006
 
 * Install Album and, more important, Album::Tutorial.
 
