@@ -1,3 +1,8 @@
+Version 1.06,
+
+* Hide in-line uuencoded material from prying eyes of stupid POD
+  converters.
+
 Version 1.05,
 
 * Several file naming fixes for Windows. Thanks to Slaven Rezic and
